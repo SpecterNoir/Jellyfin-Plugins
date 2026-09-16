@@ -8,6 +8,14 @@
     "category": "Metadata",
     "versions": [
       {
+        "version": "0.6.0.0",
+        "changelog": "Adds targeted change detection for mapped episodes and seasons. A normal Jellyfin scan now detects stale SeasonId/season-number/series links by comparing them with the physical season folder, repairs those links once, and explicitly queues mapped full refreshes for the affected episodes without causing healthy mapped items to re-fetch on every automated scan.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/SpecterNoir/Jellyfin-Plugins/releases/download/season-identifier-v0.6.0.0/SeasonIdentifier_0.6.0.0.zip",
+        "checksum": "6e4dc4cb52ada0e8ea8a2888e59fd749",
+        "timestamp": "2026-09-16T12:39:15Z"
+      },
+      {
         "version": "0.5.0.0",
         "changelog": "Makes the physical season folder authoritative when repairing mapped episodes. Episode refreshes now enumerate physical descendants instead of relying only on Jellyfin's metadata-filtered season list, replace stale cached SeasonId/season-number links before refresh, and resolve mappings from the real parent season first.",
         "targetAbi": "12.0.0.0",
