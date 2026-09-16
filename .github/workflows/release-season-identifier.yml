@@ -66,7 +66,7 @@ jobs:
           gh release create "$TAG" "$ASSET" \
             --target "$GITHUB_SHA" \
             --title "Season Identifier ${VERSION}" \
-            --notes "Season Identifier ${VERSION} for Jellyfin 12.0. Adds Jellyfin's native Identify workflow to Season items."
+            --notes "Season Identifier ${VERSION} for Jellyfin 12.x. Removes the File Transformation dependency and patches native Season Identify directly in-memory."
 
           export VERSION CHECKSUM TIMESTAMP SOURCE_URL
           python3 - <<'PY'
@@ -80,35 +80,8 @@ jobs:
           season_guid = '5d908510-bd5f-48b9-9f91-519877f4de31'
           transform_guid = '5e87cc92-571a-4d8d-8d98-d2d4147f9f90'
 
-          # Mirror the official File Transformation 12.0 catalog entry so this repository alone
-          # can satisfy Season Identifier's dependency. The binary remains hosted by its author.
-          transformation = next((item for item in catalog if item.get('guid') == transform_guid), None)
-          if transformation is None:
-              transformation = {
-                  'guid': transform_guid,
-                  'name': 'File Transformation',
-                  'overview': None,
-                  'description': "Adds support for plugins to change jellyfin-web content without actually modifying the files directly but intercepts the requests for the served data.",
-                  'owner': 'IAmParadox27',
-                  'category': 'General',
-                  'imageUrl': 'https://raw.githubusercontent.com/IAmParadox27/jellyfin-plugin-file-transformation/main/src/logo.png',
-                  'versions': []
-              }
-              catalog.append(transformation)
-
-          ft_entry = {
-              'version': '3.0.1.0',
-              'changelog': 'Add support for 12.1',
-              'targetAbi': '12.0.0.0',
-              'sourceUrl': 'https://github.com/IAmParadox27/jellyfin-plugin-file-transformation/releases/download/3.0.1.0/Release-12.0.0.zip',
-              'checksum': '9785DDF88CE9CC593BACDBD7FA8E7B79',
-              'timestamp': '2026-09-08T09:02:53'
-          }
-          transformation['versions'] = [
-              v for v in transformation.get('versions', [])
-              if not (v.get('version') == ft_entry['version'] and v.get('targetAbi') == ft_entry['targetAbi'])
-          ]
-          transformation['versions'].insert(0, ft_entry)
+          # 0.3 is self-contained. Remove the mirrored File Transformation entry that 0.2 needed.
+          catalog = [item for item in catalog if item.get('guid') != transform_guid]
 
           plugin = next((item for item in catalog if item.get('guid') == season_guid), None)
           if plugin is None:
@@ -126,12 +99,11 @@ jobs:
           version = os.environ['VERSION']
           entry = {
               'version': version,
-              'changelog': "Adds native Jellyfin Identify support for Season items. Selecting a Series in Jellyfin's normal Identify dialog now creates the title mapping automatically and refreshes child episodes through the sequential season flattener.",
+              'changelog': "Fixes native Season Identify on Jellyfin 12 by replacing the brittle compiled-bundle regex and external File Transformation dependency with a self-contained in-memory web middleware. The native Identify result is captured as a persistent season mapping and child episodes are refreshed through the sequential flattener.",
               'targetAbi': '12.0.0.0',
               'sourceUrl': os.environ['SOURCE_URL'],
               'checksum': os.environ['CHECKSUM'],
-              'timestamp': os.environ['TIMESTAMP'],
-              'dependencies': [transform_guid]
+              'timestamp': os.environ['TIMESTAMP']
           }
 
           plugin['description'] = 'Use Jellyfin native Identify on a local season to map it to a different external TV title while preserving local numbering.'

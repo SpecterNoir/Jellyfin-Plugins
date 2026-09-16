@@ -3,72 +3,145 @@ using System.Text.RegularExpressions;
 namespace Jellyfin.Plugin.SeasonIdentifier.Web;
 
 /// <summary>
-/// Minimal patch for jellyfin-web's itemHelper.canIdentify function.
+/// Patches Jellyfin Web's canIdentify eligibility expression so Season items use the native Identify flow.
+/// The matcher intentionally does not depend on minified variable names or on the exact order of item types.
 /// </summary>
 public static class SeasonIdentifyTransformation
 {
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(2);
 
-    private static readonly Regex StringFirstPattern = new(
-        "(?<prefix>[\"']Movie[\"']\\s*===\\s*(?<v>[A-Za-z_$][\\w$]*)\\s*\\|\\|\\s*[\"']Trailer[\"']\\s*===\\s*\\k<v>\\s*\\|\\|\\s*[\"']Series[\"']\\s*===\\s*\\k<v>\\s*\\|\\|)(?!\\s*[\"']Season[\"']\\s*===\\s*\\k<v>)",
+    private static readonly Regex StringFirstSeriesPattern = new(
+        "[\\\"']Series[\\\"']\\s*===\\s*(?<v>[A-Za-z_$][\\w$]*)",
         RegexOptions.Compiled,
         RegexTimeout);
 
-    private static readonly Regex VariableFirstPattern = new(
-        "(?<prefix>(?<v>[A-Za-z_$][\\w$]*)\\s*===\\s*[\"']Movie[\"']\\s*\\|\\|\\s*\\k<v>\\s*===\\s*[\"']Trailer[\"']\\s*\\|\\|\\s*\\k<v>\\s*===\\s*[\"']Series[\"']\\s*\\|\\|)(?!\\s*\\k<v>\\s*===\\s*[\"']Season[\"'])",
+    private static readonly Regex VariableFirstSeriesPattern = new(
+        "(?<v>[A-Za-z_$][\\w$]*)\\s*===\\s*[\\\"']Series[\\\"']",
         RegexOptions.Compiled,
         RegexTimeout);
 
-    /// <summary>
-    /// Payload received from File Transformation.
-    /// </summary>
-    public sealed class PatchRequestPayload
-    {
-        public string Contents { get; set; } = string.Empty;
-    }
+    private static readonly string[] CanIdentifyMarkers =
+    [
+        "Movie",
+        "Trailer",
+        "BoxSet",
+        "Person",
+        "Book",
+        "MusicAlbum",
+        "MusicArtist",
+        "MusicVideo",
+        "IsAdministrator"
+    ];
 
     /// <summary>
-    /// Determines whether this JavaScript bundle contains Jellyfin's current canIdentify condition.
+    /// Determines whether a JavaScript bundle contains Jellyfin's canIdentify eligibility expression.
     /// </summary>
     public static bool CanPatch(string contents)
+        => TryFindPatch(contents, out _, out _, out _);
+
+    /// <summary>
+    /// Adds Season beside Series in Jellyfin's native Identify eligibility expression.
+    /// </summary>
+    public static string Patch(string contents)
     {
-        if (string.IsNullOrEmpty(contents)
-            || !contents.Contains("MusicVideo", StringComparison.Ordinal)
-            || !contents.Contains("MusicArtist", StringComparison.Ordinal))
+        if (!TryFindPatch(contents, out var insertAt, out var variable, out var stringFirst))
+        {
+            return contents;
+        }
+
+        var addition = stringFirst
+            ? $"||\"Season\"==={variable}"
+            : $"||{variable}===\"Season\"";
+
+        return contents.Insert(insertAt, addition);
+    }
+
+    private static bool TryFindPatch(
+        string contents,
+        out int insertAt,
+        out string variable,
+        out bool stringFirst)
+    {
+        insertAt = -1;
+        variable = string.Empty;
+        stringFirst = false;
+
+        if (string.IsNullOrWhiteSpace(contents))
         {
             return false;
         }
 
-        return StringFirstPattern.IsMatch(contents) || VariableFirstPattern.IsMatch(contents);
+        if (TryFindCandidate(contents, StringFirstSeriesPattern, true, out insertAt, out variable))
+        {
+            stringFirst = true;
+            return true;
+        }
+
+        if (TryFindCandidate(contents, VariableFirstSeriesPattern, false, out insertAt, out variable))
+        {
+            stringFirst = false;
+            return true;
+        }
+
+        return false;
     }
 
-    /// <summary>
-    /// Adds Season to Jellyfin's existing Identify eligibility check and changes nothing else.
-    /// </summary>
-    public static string Patch(PatchRequestPayload payload)
+    private static bool TryFindCandidate(
+        string contents,
+        Regex pattern,
+        bool stringFirst,
+        out int insertAt,
+        out string variable)
     {
-        var contents = payload?.Contents ?? string.Empty;
+        insertAt = -1;
+        variable = string.Empty;
 
-        var stringFirstMatch = StringFirstPattern.Match(contents);
-        if (stringFirstMatch.Success)
+        foreach (Match match in pattern.Matches(contents))
         {
-            var variable = stringFirstMatch.Groups["v"].Value;
-            return StringFirstPattern.Replace(
-                contents,
-                match => match.Groups["prefix"].Value + "\"Season\"===" + variable + "||",
-                1);
+            var candidateVariable = match.Groups["v"].Value;
+            if (string.IsNullOrWhiteSpace(candidateVariable))
+            {
+                continue;
+            }
+
+            // canIdentify contains a distinctive cluster of item type literals plus the administrator check.
+            // Looking at a bounded window prevents an unrelated "Series" comparison elsewhere in the bundle
+            // from being patched.
+            var windowStart = Math.Max(0, match.Index - 900);
+            var windowEnd = Math.Min(contents.Length, match.Index + match.Length + 1400);
+            var window = contents.AsSpan(windowStart, windowEnd - windowStart);
+
+            var looksLikeCanIdentify = true;
+            foreach (var marker in CanIdentifyMarkers)
+            {
+                if (!window.Contains(marker, StringComparison.Ordinal))
+                {
+                    looksLikeCanIdentify = false;
+                    break;
+                }
+            }
+
+            if (!looksLikeCanIdentify)
+            {
+                continue;
+            }
+
+            var seasonStringFirst = $"\"Season\"==={candidateVariable}";
+            var seasonVariableFirst = $"{candidateVariable}===\"Season\"";
+            if (window.Contains(seasonStringFirst, StringComparison.Ordinal)
+                || window.Contains(seasonVariableFirst, StringComparison.Ordinal)
+                || window.Contains($"'Season'==={candidateVariable}", StringComparison.Ordinal)
+                || window.Contains($"{candidateVariable}==='Season'", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            insertAt = match.Index + match.Length;
+            variable = candidateVariable;
+            _ = stringFirst;
+            return true;
         }
 
-        var variableFirstMatch = VariableFirstPattern.Match(contents);
-        if (variableFirstMatch.Success)
-        {
-            var variable = variableFirstMatch.Groups["v"].Value;
-            return VariableFirstPattern.Replace(
-                contents,
-                match => match.Groups["prefix"].Value + variable + "===\"Season\"||",
-                1);
-        }
-
-        return contents;
+        return false;
     }
 }
