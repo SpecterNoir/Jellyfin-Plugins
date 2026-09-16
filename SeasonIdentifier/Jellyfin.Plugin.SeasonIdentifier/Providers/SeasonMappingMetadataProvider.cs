@@ -1,5 +1,6 @@
 using Jellyfin.Plugin.SeasonIdentifier.Configuration;
 using Jellyfin.Plugin.SeasonIdentifier.Services;
+using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
@@ -12,7 +13,7 @@ namespace Jellyfin.Plugin.SeasonIdentifier.Providers;
 /// Applies external title metadata to a mapped local season after Jellyfin's normal providers run.
 /// Native Jellyfin Identify selections are captured here and converted into persistent title mappings.
 /// </summary>
-public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>
+public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>, IHasItemChangeMonitor
 {
     private readonly SeasonMappingService _mappings;
     private readonly IProviderManager _providerManager;
@@ -33,6 +34,21 @@ public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>
 
     public string Name => "Season Identifier";
 
+    public bool HasChanged(BaseItem item, IDirectoryService directoryService)
+    {
+        _ = directoryService;
+
+        if (item is not Season season)
+        {
+            return false;
+        }
+
+        var mapping = _mappings.Get(season.Id);
+        return mapping is not null
+            && string.Equals(mapping.Mode, "Title", StringComparison.OrdinalIgnoreCase)
+            && HasBrokenEpisodeLinks(season, mapping);
+    }
+
     public async Task<ItemUpdateType> FetchAsync(
         Season item,
         MetadataRefreshOptions options,
@@ -52,8 +68,8 @@ public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>
             return ItemUpdateType.None;
         }
 
-        // Provider IDs for the external title belong to the plugin mapping, not to this local
-        // Season object. Leaving them here would let a later ordinary refresh reinterpret it.
+        var hasBrokenEpisodeLinks = HasBrokenEpisodeLinks(item, mapping);
+
         item.ProviderIds.Clear();
 
         var updateType = ItemUpdateType.None;
@@ -99,8 +115,6 @@ public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>
             }
         }
 
-        // Even if a provider returned only sparse text metadata, keep the selected title as the
-        // visible season identity rather than falling back to a generic "Season N" label.
         if (string.IsNullOrWhiteSpace(item.Name) && !string.IsNullOrWhiteSpace(mapping.ExternalTitleName))
         {
             item.Name = mapping.ExternalTitleName;
@@ -112,9 +126,11 @@ public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>
             updateType |= ItemUpdateType.ImageUpdate;
         }
 
-        // Re-identifying or manually running a full refresh on the mapped season should repair its
-        // children too. Automated library scans do not cascade, so this does not create scan storms.
+        // A broken local episode link is itself enough reason to cascade, including during the
+        // default "Scan for new and updated files" mode. Once repaired, HasChanged becomes false,
+        // so automated scans do not keep re-fetching already healthy mapped seasons forever.
         if (isManualIdentify
+            || hasBrokenEpisodeLinks
             || (!options.IsAutomated && options.MetadataRefreshMode == MetadataRefreshMode.FullRefresh))
         {
             await QueueEpisodeRefreshesAsync(item, mapping, options, cancellationToken).ConfigureAwait(false);
@@ -148,15 +164,27 @@ public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>
         };
     }
 
+    private static bool HasBrokenEpisodeLinks(Season season, SeasonMapping mapping)
+    {
+        var localSeasonNumber = season.IndexNumber ?? mapping.LocalSeasonNumber;
+        var localSeries = season.Series;
+
+        return season
+            .GetRecursiveChildren(i => i is Episode)
+            .OfType<Episode>()
+            .Where(x => !x.IsVirtualItem)
+            .Any(episode =>
+                episode.SeasonId != season.Id
+                || (localSeasonNumber.HasValue && episode.ParentIndexNumber != localSeasonNumber.Value)
+                || (localSeries is not null && episode.SeriesId != localSeries.Id));
+    }
+
     private async Task QueueEpisodeRefreshesAsync(
         Season season,
         SeasonMapping mapping,
         MetadataRefreshOptions sourceOptions,
         CancellationToken cancellationToken)
     {
-        // GetEpisodes() is metadata-aware and can exclude episodes whose stale metadata already says
-        // they belong to another season. Start with the physical descendants of this folder instead,
-        // then add Jellyfin's logical list as a fallback for virtual/non-standard layouts.
         var episodes = season
             .GetRecursiveChildren(i => i is Episode)
             .OfType<Episode>()
@@ -192,8 +220,6 @@ public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>
                 repairedLocalIdentity = true;
             }
 
-            // Persist the repaired local linkage before queuing the metadata refresh so the queued
-            // Episode object resolves back to this mapped Season instead of a stale cached season.
             if (repairedLocalIdentity)
             {
                 await episode.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
@@ -202,8 +228,6 @@ public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>
             var options = new MetadataRefreshOptions(sourceOptions)
             {
                 MetadataRefreshMode = MetadataRefreshMode.FullRefresh,
-                // Season Identifier saves mapped episode stills itself. Running Jellyfin's normal
-                // image provider here would use the real parent Series id and can fetch the wrong art.
                 ImageRefreshMode = MetadataRefreshMode.None,
                 ReplaceAllMetadata = false,
                 ReplaceAllImages = false,

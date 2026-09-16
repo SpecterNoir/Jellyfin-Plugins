@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Jellyfin.Plugin.SeasonIdentifier.Configuration;
 using Jellyfin.Plugin.SeasonIdentifier.Services;
+using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
@@ -11,7 +12,7 @@ namespace Jellyfin.Plugin.SeasonIdentifier.Providers;
 /// <summary>
 /// Translates a local episode sequence into the numbered seasons of a mapped external title.
 /// </summary>
-public class EpisodeMappingMetadataProvider : ICustomMetadataProvider<Episode>
+public class EpisodeMappingMetadataProvider : ICustomMetadataProvider<Episode>, IHasItemChangeMonitor
 {
     private const int MaxExternalSeasons = 50;
     private readonly SeasonMappingService _mappings;
@@ -33,6 +34,41 @@ public class EpisodeMappingMetadataProvider : ICustomMetadataProvider<Episode>
     }
 
     public string Name => "Season Identifier";
+
+    public bool HasChanged(BaseItem item, IDirectoryService directoryService)
+    {
+        _ = directoryService;
+
+        if (item is not Episode episode)
+        {
+            return false;
+        }
+
+        var physicalSeasonId = episode.FindSeasonId();
+        if (physicalSeasonId == Guid.Empty)
+        {
+            return false;
+        }
+
+        var mapping = _mappings.Get(physicalSeasonId);
+        if (mapping is null || !string.Equals(mapping.Mode, "Title", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var localSeason = _libraryManager.GetItemById(physicalSeasonId) as Season;
+        if (localSeason is null)
+        {
+            return episode.SeasonId != physicalSeasonId;
+        }
+
+        var localSeasonNumber = localSeason.IndexNumber ?? mapping.LocalSeasonNumber;
+        var localSeries = localSeason.Series;
+
+        return episode.SeasonId != physicalSeasonId
+            || (localSeasonNumber.HasValue && episode.ParentIndexNumber != localSeasonNumber.Value)
+            || (localSeries is not null && episode.SeriesId != localSeries.Id);
+    }
 
     public async Task<ItemUpdateType> FetchAsync(
         Episode item,
@@ -118,9 +154,6 @@ public class EpisodeMappingMetadataProvider : ICustomMetadataProvider<Episode>
 
             var updateType = ItemUpdateType.MetadataDownload;
 
-            // TMDb's normal image provider looks at the real parent Series id, which intentionally
-            // remains the local series. Ask TMDb with the mapped title identity instead and use the
-            // same response as a fallback for missing descriptions.
             var supplement = await _tmdbSupplement.GetEpisodeSupplementAsync(
                 mapping,
                 resolved.ExternalSeason,

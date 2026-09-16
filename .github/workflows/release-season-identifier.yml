@@ -66,7 +66,7 @@ jobs:
           gh release create "$TAG" "$ASSET" \
             --target "$GITHUB_SHA" \
             --title "Season Identifier ${VERSION}" \
-            --notes "Season Identifier ${VERSION} for Jellyfin 12.x. Makes the physical season folder authoritative for episode repair and mapped metadata refreshes."
+            --notes "Season Identifier ${VERSION} for Jellyfin 12.x. Repairs stale episode-to-season links during normal refreshes and then refreshes those episodes through the mapped title."
 
           export VERSION CHECKSUM TIMESTAMP SOURCE_URL
           python3 - <<'PY'
@@ -98,7 +98,7 @@ jobs:
           version = os.environ['VERSION']
           entry = {
               'version': version,
-              'changelog': "Makes the physical season folder authoritative when repairing mapped episodes. Episode refreshes now enumerate physical descendants instead of relying only on Jellyfin's metadata-filtered season list, replace stale cached SeasonId/season-number links before refresh, and resolve mappings from the real parent season first.",
+              'changelog': "Adds targeted change detection for mapped episodes and seasons. A normal Jellyfin scan now detects stale SeasonId/season-number/series links by comparing them with the physical season folder, repairs those links once, and explicitly queues mapped full refreshes for the affected episodes without causing healthy mapped items to re-fetch on every automated scan.",
               'targetAbi': '12.0.0.0',
               'sourceUrl': os.environ['SOURCE_URL'],
               'checksum': os.environ['CHECKSUM'],
