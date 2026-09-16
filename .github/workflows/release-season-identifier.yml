@@ -1,0 +1,119 @@
+name: Publish Season Identifier
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'SeasonIdentifier/**'
+      - '.github/workflows/release-season-identifier.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        run: dotnet build SeasonIdentifier/Jellyfin.Plugin.SeasonIdentifier/Jellyfin.Plugin.SeasonIdentifier.csproj -c Release
+
+      - name: Package, release, and update catalog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PROJECT='SeasonIdentifier/Jellyfin.Plugin.SeasonIdentifier/Jellyfin.Plugin.SeasonIdentifier.csproj'
+          DLL='SeasonIdentifier/Jellyfin.Plugin.SeasonIdentifier/bin/Release/net10.0/Jellyfin.Plugin.SeasonIdentifier.dll'
+
+          VERSION=$(python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse('SeasonIdentifier/Jellyfin.Plugin.SeasonIdentifier/Jellyfin.Plugin.SeasonIdentifier.csproj').getroot()
+          version = root.findtext('.//Version')
+          if not version:
+              raise SystemExit('Plugin <Version> is missing from csproj')
+          print(version.strip())
+          PY
+          )
+
+          TAG="season-identifier-v${VERSION}"
+          ASSET="SeasonIdentifier_${VERSION}.zip"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Release $TAG already exists. Bump <Version> before publishing another Season Identifier build."
+            exit 1
+          fi
+
+          rm -rf package "$ASSET"
+          mkdir package
+          cp "$DLL" package/
+          (cd package && zip -q -r "../$ASSET" .)
+
+          CHECKSUM=$(md5sum "$ASSET" | awk '{print $1}')
+          TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          SOURCE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${ASSET}"
+
+          gh release create "$TAG" "$ASSET" \
+            --target "$GITHUB_SHA" \
+            --title "Season Identifier ${VERSION}" \
+            --notes "Season Identifier ${VERSION} for Jellyfin 12.0. Install or update it through the Jellyfin plugin catalog."
+
+          export VERSION CHECKSUM TIMESTAMP SOURCE_URL
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path('manifest.json')
+          if path.exists():
+              catalog = json.loads(path.read_text(encoding='utf-8'))
+          else:
+              catalog = []
+
+          guid = '5d908510-bd5f-48b9-9f91-519877f4de31'
+          plugin = next((item for item in catalog if item.get('guid') == guid), None)
+          if plugin is None:
+              plugin = {
+                  'guid': guid,
+                  'name': 'Season Identifier',
+                  'description': 'Map a local Jellyfin season to metadata from a different external TV title while preserving the local series, season folder, and episode numbering.',
+                  'overview': 'Identify non-standard local seasons as another TV title.',
+                  'owner': 'SpecterNoir',
+                  'category': 'Metadata',
+                  'versions': []
+              }
+              catalog.append(plugin)
+
+          version = os.environ['VERSION']
+          entry = {
+              'version': version,
+              'changelog': 'Initial catalog release. Supports entire-title season mapping and sequential flattening of numbered external seasons while ignoring Season 0 / Specials.',
+              'targetAbi': '12.0.0.0',
+              'sourceUrl': os.environ['SOURCE_URL'],
+              'checksum': os.environ['CHECKSUM'],
+              'timestamp': os.environ['TIMESTAMP']
+          }
+
+          plugin['versions'] = [v for v in plugin.get('versions', []) if v.get('version') != version]
+          plugin['versions'].insert(0, entry)
+          path.write_text(json.dumps(catalog, indent=2) + '\n', encoding='utf-8')
+          PY
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add manifest.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update plugin catalog for Season Identifier ${VERSION} [skip ci]"
+            git push origin HEAD:main
+          fi
