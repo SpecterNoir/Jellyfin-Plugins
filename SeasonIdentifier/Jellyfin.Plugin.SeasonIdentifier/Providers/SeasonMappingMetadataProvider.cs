@@ -17,15 +17,18 @@ public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>
     private readonly SeasonMappingService _mappings;
     private readonly IProviderManager _providerManager;
     private readonly ILibraryManager _libraryManager;
+    private readonly TmdbMappedSupplementService _tmdbSupplement;
 
     public SeasonMappingMetadataProvider(
         SeasonMappingService mappings,
         IProviderManager providerManager,
-        ILibraryManager libraryManager)
+        ILibraryManager libraryManager,
+        TmdbMappedSupplementService tmdbSupplement)
     {
         _mappings = mappings;
         _providerManager = providerManager;
         _libraryManager = libraryManager;
+        _tmdbSupplement = tmdbSupplement;
     }
 
     public string Name => "Season Identifier";
@@ -36,17 +39,12 @@ public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>
         CancellationToken cancellationToken)
     {
         var mapping = _mappings.Get(item.Id);
+        var isManualIdentify = IsManualIdentify(options.SearchResult);
 
-        if (IsManualIdentify(options.SearchResult))
+        if (isManualIdentify)
         {
             mapping = CreateMapping(item, options.SearchResult!);
             _mappings.Upsert(mapping);
-
-            // Jellyfin's generic Apply endpoint temporarily places the selected Series IDs on the
-            // Season item. They belong to the plugin mapping, not to the local Season itself.
-            item.ProviderIds.Clear();
-
-            QueueEpisodeRefreshes(item, options);
         }
 
         if (mapping is null || !string.Equals(mapping.Mode, "Title", StringComparison.OrdinalIgnoreCase))
@@ -54,52 +52,75 @@ public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>
             return ItemUpdateType.None;
         }
 
-        // Keep the local Season free of provider IDs that could make a later normal refresh reinterpret it.
+        // Provider IDs for the external title belong to the plugin mapping, not to this local
+        // Season object. Leaving them here would let a later ordinary refresh reinterpret it.
         item.ProviderIds.Clear();
 
+        var updateType = ItemUpdateType.None;
         var series = item.Series;
-        if (series is null)
+
+        if (series is not null)
         {
-            return ItemUpdateType.None;
+            var lookup = new SeriesInfo
+            {
+                Name = mapping.ExternalTitleName,
+                Year = mapping.ExternalYear,
+                MetadataLanguage = item.GetPreferredMetadataLanguage(),
+                MetadataCountryCode = item.GetPreferredMetadataCountryCode(),
+                ProviderIds = SeasonMappingService.ToProviderDictionary(mapping),
+                IsAutomated = false
+            };
+
+            var providers = _providerManager
+                .GetMetadataProviders<Series>(series, _libraryManager.GetLibraryOptions(series))
+                .OfType<IRemoteMetadataProvider<Series, SeriesInfo>>()
+                .OrderBy(x => string.Equals(x.Name, mapping.SearchProviderName, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ToArray();
+
+            foreach (var provider in providers)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var result = await provider.GetMetadata(lookup, cancellationToken).ConfigureAwait(false);
+                if (!result.HasMetadata || result.Item is null)
+                {
+                    continue;
+                }
+
+                MetadataCopy.ApplySeriesToSeason(result.Item, item);
+
+                if (result.People is { Count: > 0 })
+                {
+                    await _libraryManager.UpdatePeopleAsync(item, result.People, cancellationToken).ConfigureAwait(false);
+                }
+
+                updateType |= ItemUpdateType.MetadataDownload;
+                break;
+            }
         }
 
-        var lookup = new SeriesInfo
+        // Even if a provider returned only sparse text metadata, keep the selected title as the
+        // visible season identity rather than falling back to a generic "Season N" label.
+        if (string.IsNullOrWhiteSpace(item.Name) && !string.IsNullOrWhiteSpace(mapping.ExternalTitleName))
         {
-            Name = mapping.ExternalTitleName,
-            Year = mapping.ExternalYear,
-            MetadataLanguage = item.GetPreferredMetadataLanguage(),
-            MetadataCountryCode = item.GetPreferredMetadataCountryCode(),
-            ProviderIds = SeasonMappingService.ToProviderDictionary(mapping),
-            IsAutomated = false
-        };
-
-        var providers = _providerManager
-            .GetMetadataProviders<Series>(series, _libraryManager.GetLibraryOptions(series))
-            .OfType<IRemoteMetadataProvider<Series, SeriesInfo>>()
-            .OrderBy(x => string.Equals(x.Name, mapping.SearchProviderName, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-            .ToArray();
-
-        foreach (var provider in providers)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var result = await provider.GetMetadata(lookup, cancellationToken).ConfigureAwait(false);
-            if (!result.HasMetadata || result.Item is null)
-            {
-                continue;
-            }
-
-            MetadataCopy.ApplySeriesToSeason(result.Item, item);
-
-            if (result.People is { Count: > 0 })
-            {
-                await _libraryManager.UpdatePeopleAsync(item, result.People, cancellationToken).ConfigureAwait(false);
-            }
-
-            return ItemUpdateType.MetadataDownload;
+            item.Name = mapping.ExternalTitleName;
+            updateType |= ItemUpdateType.MetadataEdit;
         }
 
-        return ItemUpdateType.None;
+        if (await _tmdbSupplement.ApplySeasonImagesAsync(item, mapping, cancellationToken).ConfigureAwait(false))
+        {
+            updateType |= ItemUpdateType.ImageUpdate;
+        }
+
+        // Re-identifying or manually running a full refresh on the mapped season should repair its
+        // children too. Automated library scans do not cascade, so this does not create scan storms.
+        if (isManualIdentify
+            || (!options.IsAutomated && options.MetadataRefreshMode == MetadataRefreshMode.FullRefresh))
+        {
+            QueueEpisodeRefreshes(item, options);
+        }
+
+        return updateType;
     }
 
     private static bool IsManualIdentify(RemoteSearchResult? result)
@@ -134,6 +155,8 @@ public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>
             var options = new MetadataRefreshOptions(sourceOptions)
             {
                 MetadataRefreshMode = MetadataRefreshMode.FullRefresh,
+                // Season Identifier saves mapped episode stills itself. Running Jellyfin's normal
+                // image provider here would use the real parent Series id and can fetch the wrong art.
                 ImageRefreshMode = MetadataRefreshMode.None,
                 ReplaceAllMetadata = false,
                 ReplaceAllImages = false,

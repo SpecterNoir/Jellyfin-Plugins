@@ -17,6 +17,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         _ = applicationHost;
 
         serviceCollection.AddSingleton<SeasonMappingService>();
+        serviceCollection.AddSingleton<TmdbMappedSupplementService>();
         serviceCollection.AddSingleton<SeasonIdentifyWebState>();
         serviceCollection.AddTransient<IStartupFilter, SeasonIdentifyStartupFilter>();
     }

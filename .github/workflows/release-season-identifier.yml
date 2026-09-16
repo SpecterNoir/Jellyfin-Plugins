@@ -66,7 +66,7 @@ jobs:
           gh release create "$TAG" "$ASSET" \
             --target "$GITHUB_SHA" \
             --title "Season Identifier ${VERSION}" \
-            --notes "Season Identifier ${VERSION} for Jellyfin 12.x. Removes the File Transformation dependency and patches native Season Identify directly in-memory."
+            --notes "Season Identifier ${VERSION} for Jellyfin 12.x. Repairs mapped episode metadata and adds mapped title/episode artwork while preserving local numbering."
 
           export VERSION CHECKSUM TIMESTAMP SOURCE_URL
           python3 - <<'PY'
@@ -80,7 +80,6 @@ jobs:
           season_guid = '5d908510-bd5f-48b9-9f91-519877f4de31'
           transform_guid = '5e87cc92-571a-4d8d-8d98-d2d4147f9f90'
 
-          # 0.3 is self-contained. Remove the mirrored File Transformation entry that 0.2 needed.
           catalog = [item for item in catalog if item.get('guid') != transform_guid]
 
           plugin = next((item for item in catalog if item.get('guid') == season_guid), None)
@@ -99,7 +98,7 @@ jobs:
           version = os.environ['VERSION']
           entry = {
               'version': version,
-              'changelog': "Fixes native Season Identify on Jellyfin 12 by replacing the brittle compiled-bundle regex and external File Transformation dependency with a self-contained in-memory web middleware. The native Identify result is captured as a persistent season mapping and child episodes are refreshed through the sequential flattener.",
+              'changelog': "Repairs mapped episode metadata by resolving the real parent season when SeasonId is not cached, expands copied source metadata, cascades manual season refreshes to child episodes, and adds mapped TMDb series posters/backdrops plus episode stills without changing the local series hierarchy or numbering.",
               'targetAbi': '12.0.0.0',
               'sourceUrl': os.environ['SOURCE_URL'],
               'checksum': os.environ['CHECKSUM'],
