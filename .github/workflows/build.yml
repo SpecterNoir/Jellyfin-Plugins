@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  season-identifier:
+  plugins:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,10 +24,18 @@ jobs:
       - name: Build
         run: dotnet build Jellyfin-Plugins.slnx -c Release --no-restore
 
-      - name: Upload plugin
+      - name: Upload Season Identifier
         uses: actions/upload-artifact@v4
         with:
           name: SeasonIdentifier
           path: |
             SeasonIdentifier/Jellyfin.Plugin.SeasonIdentifier/bin/Release/net10.0/Jellyfin.Plugin.SeasonIdentifier.dll
+          if-no-files-found: error
+
+      - name: Upload Visibility Manager
+        uses: actions/upload-artifact@v4
+        with:
+          name: VisibilityManager
+          path: |
+            VisibilityManager/Jellyfin.Plugin.VisibilityManager/bin/Release/net10.0/Jellyfin.Plugin.VisibilityManager.dll
           if-no-files-found: error

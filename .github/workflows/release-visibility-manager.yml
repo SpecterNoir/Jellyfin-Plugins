@@ -1,0 +1,116 @@
+name: Publish Visibility Manager
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'VisibilityManager/**'
+      - '.github/workflows/release-visibility-manager.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        run: dotnet build VisibilityManager/Jellyfin.Plugin.VisibilityManager/Jellyfin.Plugin.VisibilityManager.csproj -c Release
+
+      - name: Package, release, and update catalog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DLL='VisibilityManager/Jellyfin.Plugin.VisibilityManager/bin/Release/net10.0/Jellyfin.Plugin.VisibilityManager.dll'
+
+          VERSION=$(python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse('VisibilityManager/Jellyfin.Plugin.VisibilityManager/Jellyfin.Plugin.VisibilityManager.csproj').getroot()
+          version = root.findtext('.//Version')
+          if not version:
+              raise SystemExit('Plugin <Version> is missing from csproj')
+          print(version.strip())
+          PY
+          )
+
+          TAG="visibility-manager-v${VERSION}"
+          ASSET="VisibilityManager_${VERSION}.zip"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Release $TAG already exists. Bump <Version> before publishing another Visibility Manager build."
+            exit 1
+          fi
+
+          rm -rf package "$ASSET"
+          mkdir package
+          cp "$DLL" package/
+          (cd package && zip -q -r "../$ASSET" .)
+
+          CHECKSUM=$(md5sum "$ASSET" | awk '{print $1}')
+          TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          SOURCE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${ASSET}"
+
+          gh release create "$TAG" "$ASSET" \
+            --target "$GITHUB_SHA" \
+            --title "Visibility Manager ${VERSION}" \
+            --notes "Initial Visibility Manager build for Jellyfin 12.x. Hides selected Series, Seasons (including virtual seasons), Movies, and Episodes through reversible Jellyfin visibility metadata. No media files are deleted, moved, renamed, or recycled."
+
+          export VERSION CHECKSUM TIMESTAMP SOURCE_URL
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path('manifest.json')
+          catalog = json.loads(path.read_text(encoding='utf-8')) if path.exists() else []
+
+          plugin_guid = 'b731d013-e6e6-4c1c-949c-244c76719434'
+          plugin = next((item for item in catalog if item.get('guid') == plugin_guid), None)
+          if plugin is None:
+              plugin = {
+                  'guid': plugin_guid,
+                  'name': 'Visibility Manager',
+                  'description': 'Hide selected Jellyfin library entries from normal browsing and search without deleting, moving, or renaming media files.',
+                  'overview': 'Reversibly hide unwanted or duplicate library entries.',
+                  'owner': 'SpecterNoir',
+                  'category': 'General',
+                  'versions': []
+              }
+              catalog.append(plugin)
+
+          version = os.environ['VERSION']
+          entry = {
+              'version': version,
+              'changelog': 'Initial release. Adds a dedicated visibility page for Series, Seasons including virtual seasons, Movies, and Episodes. Hide and Restore use a reversible Jellyfin metadata marker and native blocked-tag filtering; media files and library database entries are never deleted.',
+              'targetAbi': '12.0.0.0',
+              'sourceUrl': os.environ['SOURCE_URL'],
+              'checksum': os.environ['CHECKSUM'],
+              'timestamp': os.environ['TIMESTAMP']
+          }
+
+          plugin['description'] = 'Hide selected Jellyfin library entries from normal browsing and search without deleting, moving, or renaming media files.'
+          plugin['versions'] = [v for v in plugin.get('versions', []) if v.get('version') != version]
+          plugin['versions'].insert(0, entry)
+          path.write_text(json.dumps(catalog, indent=2) + '\n', encoding='utf-8')
+          PY
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add manifest.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update plugin catalog for Visibility Manager ${VERSION} [skip ci]"
+            git push origin HEAD:main
+          fi
