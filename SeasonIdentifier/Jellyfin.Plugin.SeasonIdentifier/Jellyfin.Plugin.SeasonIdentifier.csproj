@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Jellyfin.Plugin.SeasonIdentifier</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.SeasonIdentifier</AssemblyName>
+    <Version>0.1.0</Version>
+    <Description>Map a local Jellyfin season to a different external TV title while preserving local folder and episode numbering.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
