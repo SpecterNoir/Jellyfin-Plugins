@@ -2,12 +2,12 @@ using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.SeasonIdentifier.Configuration;
 using Jellyfin.Plugin.SeasonIdentifier.Services;
 using MediaBrowser.Common.Api;
+using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.IO;
-using MediaBrowser.Model.Querying;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
