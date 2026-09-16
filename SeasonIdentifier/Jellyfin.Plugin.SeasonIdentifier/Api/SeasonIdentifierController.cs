@@ -8,13 +8,14 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.IO;
+using MediaBrowser.Model.Providers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jellyfin.Plugin.SeasonIdentifier.Api;
 
 /// <summary>
-/// Administration API for season mappings.
+/// Administration API for season mappings and the native season Identify bridge.
 /// </summary>
 [ApiController]
 [Route("SeasonIdentifier/api")]
@@ -36,6 +37,45 @@ public class SeasonIdentifierController : ControllerBase
         _providerManager = providerManager;
         _fileSystem = fileSystem;
         _mappings = mappings;
+    }
+
+    /// <summary>
+    /// Adds the remote-search endpoint that Jellyfin Web expects when Identify is opened on a Season.
+    /// The results are deliberately Series results because title mode identifies the whole external title.
+    /// </summary>
+    [HttpPost("/Items/RemoteSearch/Season")]
+    public async Task<ActionResult<IEnumerable<RemoteSearchResult>>> GetSeasonRemoteSearchResults(
+        [FromBody] RemoteSearchQuery<SeasonInfo> query,
+        CancellationToken cancellationToken = default)
+    {
+        if (query.SearchInfo is null)
+        {
+            return BadRequest();
+        }
+
+        var seasonSearch = query.SearchInfo;
+        var seriesQuery = new RemoteSearchQuery<SeriesInfo>
+        {
+            SearchInfo = new SeriesInfo
+            {
+                Name = seasonSearch.Name,
+                OriginalTitle = seasonSearch.OriginalTitle,
+                Year = seasonSearch.Year,
+                PremiereDate = seasonSearch.PremiereDate,
+                MetadataLanguage = seasonSearch.MetadataLanguage,
+                MetadataCountryCode = seasonSearch.MetadataCountryCode,
+                ProviderIds = new Dictionary<string, string>(seasonSearch.ProviderIds, StringComparer.OrdinalIgnoreCase),
+                IsAutomated = false
+            },
+            SearchProviderName = query.SearchProviderName,
+            IncludeDisabledProviders = query.IncludeDisabledProviders
+        };
+
+        var results = await _providerManager
+            .GetRemoteSearchResults<Series, SeriesInfo>(seriesQuery, cancellationToken)
+            .ConfigureAwait(false);
+
+        return Ok(results);
     }
 
     [HttpGet("seasons")]

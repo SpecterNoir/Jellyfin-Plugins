@@ -38,7 +38,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             {
                 Name = Name,
                 DisplayName = Name,
-                EnableInMainMenu = true,
+                EnableInMainMenu = false,
                 MenuIcon = "video_library",
                 EmbeddedResourcePath = resourcePrefix + "configPage.html"
             },

@@ -2,21 +2,18 @@
 
 Season Identifier fixes a metadata problem caused by intentionally non-standard season layouts.
 
-Jellyfin derives seasons from folders. If a local series contains a season number that does not exist under that series in the configured metadata provider, Jellyfin can attach incorrect metadata. Season Identifier lets an administrator explicitly map that local season to a different external TV title.
+Jellyfin derives seasons from folders. If a local series contains a season number that does not exist under that series in the configured metadata provider, Jellyfin can attach incorrect metadata. Season Identifier lets the normal Jellyfin **Identify** workflow map that local season to a different external TV title.
 
-## Install
+## 0.2.0 scope
 
-Add the repository URL once in **Jellyfin Dashboard → Plugins → Repositories**:
+The primary workflow is now native Jellyfin Identify:
 
-```text
-https://raw.githubusercontent.com/SpecterNoir/Jellyfin-Plugins/main/manifest.json
-```
+1. Open a Season in Jellyfin Web.
+2. Open its menu and choose **Identify**.
+3. Search for the external TV title that season represents.
+4. Select the result and apply it using Jellyfin's normal Identify dialog.
 
-Then open the normal Jellyfin **Plugin Catalog**, find **Season Identifier**, install it, and restart Jellyfin when prompted. Updates will appear through the same catalog.
-
-## 0.1.0.0 scope
-
-This first build implements **Entire title** mapping.
+The plugin stores that choice as the season's title mapping while preserving the local series, season number, and episode numbering.
 
 Example:
 
@@ -28,13 +25,13 @@ JoJo's Bizarre Adventure/
     ├── ...
     └── S03E48
 
-Metadata source
+Identify Season 3 as:
 JoJo's Bizarre Adventure: Stardust Crusaders
 ├── Season 1 (24 episodes)
 └── Season 2 (24 episodes)
 ```
 
-The local numbering stays intact. Metadata is translated as:
+The local numbering stays intact. Episode metadata is translated as:
 
 ```text
 S03E01 -> Stardust Crusaders S01E01
@@ -45,21 +42,19 @@ S03E25 -> Stardust Crusaders S02E01
 S03E48 -> Stardust Crusaders S02E24
 ```
 
-Season 0 / Specials are intentionally ignored.
+Season 0 / Specials are intentionally ignored in title mode.
 
-### Not in 0.1.0.0
+The older configuration page remains available only as an advanced/fallback mapping view. It is no longer the primary workflow and is no longer added to Jellyfin's main navigation.
+
+## Dependency
+
+Native Season Identify uses **File Transformation** by IAmParadox27 to expose Jellyfin Web's existing Identify command on Season items without modifying Jellyfin's installed web files. The Jellyfin plugin catalog entry declares this dependency automatically.
+
+## Not yet implemented
 
 - Mapping to one specific external season.
 - Manual per-episode remapping.
 - Special-placement rules.
 - Modifying or renaming folders.
 
-Those can be added after the title-mapping path is proven reliable.
-
-## Building
-
-Requires the .NET 10 SDK.
-
-```bash
-dotnet build Jellyfin-Plugins.slnx -c Release
-```
+Specific-season mode is planned after the native title-identification path is validated.
