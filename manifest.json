@@ -59,5 +59,23 @@
         "timestamp": "2026-09-16T09:57:44Z"
       }
     ]
+  },
+  {
+    "guid": "b731d013-e6e6-4c1c-949c-244c76719434",
+    "name": "Visibility Manager",
+    "description": "Hide selected Jellyfin library entries from normal browsing and search without deleting, moving, or renaming media files.",
+    "overview": "Reversibly hide unwanted or duplicate library entries.",
+    "owner": "SpecterNoir",
+    "category": "General",
+    "versions": [
+      {
+        "version": "0.1.0.0",
+        "changelog": "Initial release. Adds a dedicated visibility page for Series, Seasons including virtual seasons, Movies, and Episodes. Hide and Restore use a reversible Jellyfin metadata marker and native blocked-tag filtering; media files and library database entries are never deleted.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/SpecterNoir/Jellyfin-Plugins/releases/download/visibility-manager-v0.1.0.0/VisibilityManager_0.1.0.0.zip",
+        "checksum": "9c00710fe205c89d143a2134f706a6b0",
+        "timestamp": "2026-09-16T16:51:57Z"
+      }
+    ]
   }
 ]
