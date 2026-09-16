@@ -224,6 +224,8 @@ public sealed class TmdbMappedSupplementService
 
     private static bool TryGetTmdbId(SeasonMapping mapping, out int tmdbId)
     {
+        tmdbId = 0;
+
         var entry = mapping.ProviderIds.FirstOrDefault(x =>
             string.Equals(x.Key, "Tmdb", StringComparison.OrdinalIgnoreCase)
             || string.Equals(x.Key, "TheMovieDb", StringComparison.OrdinalIgnoreCase));
