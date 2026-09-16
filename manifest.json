@@ -2,11 +2,22 @@
   {
     "guid": "5d908510-bd5f-48b9-9f91-519877f4de31",
     "name": "Season Identifier",
-    "description": "Map a local Jellyfin season to metadata from a different external TV title while preserving the local series, season folder, and episode numbering.",
+    "description": "Use Jellyfin native Identify on a local season to map it to a different external TV title while preserving local numbering.",
     "overview": "Identify non-standard local seasons as another TV title.",
     "owner": "SpecterNoir",
     "category": "Metadata",
     "versions": [
+      {
+        "version": "0.2.0.0",
+        "changelog": "Adds native Jellyfin Identify support for Season items. Selecting a Series in Jellyfin's normal Identify dialog now creates the title mapping automatically and refreshes child episodes through the sequential season flattener.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/SpecterNoir/Jellyfin-Plugins/releases/download/season-identifier-v0.2.0.0/SeasonIdentifier_0.2.0.0.zip",
+        "checksum": "b67cf808a7f7351b65db9aedbcd60012",
+        "timestamp": "2026-09-16T10:30:25Z",
+        "dependencies": [
+          "5e87cc92-571a-4d8d-8d98-d2d4147f9f90"
+        ]
+      },
       {
         "version": "0.1.0.0",
         "changelog": "Initial catalog release. Supports entire-title season mapping and sequential flattening of numbered external seasons while ignoring Season 0 / Specials.",
@@ -14,6 +25,25 @@
         "sourceUrl": "https://github.com/SpecterNoir/Jellyfin-Plugins/releases/download/season-identifier-v0.1.0.0/SeasonIdentifier_0.1.0.0.zip",
         "checksum": "2cf91ec04c8cee2c6ab97dea700d41a3",
         "timestamp": "2026-09-16T09:57:44Z"
+      }
+    ]
+  },
+  {
+    "guid": "5e87cc92-571a-4d8d-8d98-d2d4147f9f90",
+    "name": "File Transformation",
+    "overview": null,
+    "description": "Adds support for plugins to change jellyfin-web content without actually modifying the files directly but intercepts the requests for the served data.",
+    "owner": "IAmParadox27",
+    "category": "General",
+    "imageUrl": "https://raw.githubusercontent.com/IAmParadox27/jellyfin-plugin-file-transformation/main/src/logo.png",
+    "versions": [
+      {
+        "version": "3.0.1.0",
+        "changelog": "Add support for 12.1",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/IAmParadox27/jellyfin-plugin-file-transformation/releases/download/3.0.1.0/Release-12.0.0.zip",
+        "checksum": "9785DDF88CE9CC593BACDBD7FA8E7B79",
+        "timestamp": "2026-09-08T09:02:53"
       }
     ]
   }
