@@ -1,0 +1,20 @@
+[
+  {
+    "guid": "5d908510-bd5f-48b9-9f91-519877f4de31",
+    "name": "Season Identifier",
+    "description": "Map a local Jellyfin season to metadata from a different external TV title while preserving the local series, season folder, and episode numbering.",
+    "overview": "Identify non-standard local seasons as another TV title.",
+    "owner": "SpecterNoir",
+    "category": "Metadata",
+    "versions": [
+      {
+        "version": "0.1.0.0",
+        "changelog": "Initial catalog release. Supports entire-title season mapping and sequential flattening of numbered external seasons while ignoring Season 0 / Specials.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/SpecterNoir/Jellyfin-Plugins/releases/download/season-identifier-v0.1.0.0/SeasonIdentifier_0.1.0.0.zip",
+        "checksum": "2cf91ec04c8cee2c6ab97dea700d41a3",
+        "timestamp": "2026-09-16T09:57:44Z"
+      }
+    ]
+  }
+]
