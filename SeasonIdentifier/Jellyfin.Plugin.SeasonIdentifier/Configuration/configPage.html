@@ -1,0 +1,88 @@
+<div id="SeasonIdentifierPage"
+     data-role="page"
+     class="page type-interior pluginConfigurationPage"
+     data-require="emby-input,emby-button"
+     data-controller="__plugin/SeasonIdentifier_admin.js">
+    <style>
+        #SeasonIdentifierPage * { box-sizing: border-box; }
+        #SeasonIdentifierPage .si-shell { max-width: 1100px; margin: 0 auto; padding: 2rem 1.2rem 5rem; }
+        #SeasonIdentifierPage .si-head { margin-bottom: 1.5rem; }
+        #SeasonIdentifierPage .si-head h1 { margin: 0 0 .4rem; }
+        #SeasonIdentifierPage .si-muted { opacity: .72; }
+        #SeasonIdentifierPage .si-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        #SeasonIdentifierPage .si-card { border: 1px solid rgba(255,255,255,.13); border-radius: 14px; padding: 1rem; background: rgba(255,255,255,.04); }
+        #SeasonIdentifierPage .si-card h2 { margin-top: 0; }
+        #SeasonIdentifierPage .si-field { margin-bottom: 1rem; }
+        #SeasonIdentifierPage .si-field label { display: block; font-weight: 700; margin-bottom: .35rem; }
+        #SeasonIdentifierPage input { width: 100%; }
+        #SeasonIdentifierPage .si-results { display: grid; gap: .45rem; max-height: 330px; overflow: auto; margin-top: .65rem; }
+        #SeasonIdentifierPage .si-result { width: 100%; text-align: left; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; padding: .75rem; color: inherit; background: rgba(0,0,0,.12); cursor: pointer; }
+        #SeasonIdentifierPage .si-result:hover { background: rgba(255,255,255,.08); }
+        #SeasonIdentifierPage .si-result.is-selected { border-color: #00a4dc; background: rgba(0,164,220,.14); }
+        #SeasonIdentifierPage .si-result strong, #SeasonIdentifierPage .si-result small { display:block; }
+        #SeasonIdentifierPage .si-result small { opacity:.7; margin-top:.2rem; }
+        #SeasonIdentifierPage .si-selection { min-height: 4.2rem; padding: .8rem; border-radius: 10px; background: rgba(0,0,0,.18); margin-bottom: 1rem; }
+        #SeasonIdentifierPage .si-actions { display:flex; gap:.6rem; flex-wrap:wrap; }
+        #SeasonIdentifierPage button { cursor:pointer; }
+        #SeasonIdentifierPage .si-save { background:#00a4dc; color:#fff; border:0; border-radius:8px; padding:.7rem 1rem; font-weight:700; }
+        #SeasonIdentifierPage .si-save:disabled { opacity:.45; cursor:not-allowed; }
+        #SeasonIdentifierPage .si-secondary { border:1px solid rgba(255,255,255,.16); color:inherit; background:rgba(255,255,255,.05); border-radius:8px; padding:.55rem .8rem; }
+        #SeasonIdentifierPage .si-danger { border-color:rgba(239,68,68,.5); color:#fecaca; }
+        #SeasonIdentifierPage .si-mappings { display:grid; gap:.6rem; margin-top:.8rem; }
+        #SeasonIdentifierPage .si-map { display:grid; grid-template-columns:1fr auto; gap:.8rem; align-items:center; padding:.8rem; border:1px solid rgba(255,255,255,.1); border-radius:10px; }
+        #SeasonIdentifierPage .si-map strong, #SeasonIdentifierPage .si-map small { display:block; }
+        #SeasonIdentifierPage .si-map small { opacity:.72; margin-top:.2rem; }
+        #SeasonIdentifierPage .si-full { grid-column:1/-1; }
+        #SeasonIdentifierPage .si-note { border-left:3px solid #00a4dc; padding:.7rem .9rem; background:rgba(0,164,220,.08); line-height:1.45; margin-bottom:1rem; }
+        #SeasonIdentifierPage .si-status { margin-top:.7rem; min-height:1.2rem; }
+        #SeasonIdentifierPage .si-status.error { color:#fca5a5; }
+        #SeasonIdentifierPage .si-status.good { color:#86efac; }
+        @media(max-width:800px) { #SeasonIdentifierPage .si-grid { grid-template-columns:1fr; } }
+    </style>
+
+    <div class="si-shell">
+        <div class="si-head">
+            <h1>Season Identifier</h1>
+            <p class="si-muted">Map a local Jellyfin season to another TV title while keeping your local season numbering and folders unchanged.</p>
+        </div>
+
+        <div class="si-note">
+            <strong>0.1.0 — Entire title mode.</strong>
+            Numbered seasons from the selected external title are flattened into the local season. Season 0 / Specials are ignored.
+        </div>
+
+        <div class="si-grid">
+            <section class="si-card">
+                <h2>1. Local season</h2>
+                <div class="si-field">
+                    <label for="si-local-search">Find a season</label>
+                    <input id="si-local-search" is="emby-input" type="text" placeholder="JoJo, Daredevil, Season 4..." />
+                </div>
+                <div id="si-local-results" class="si-results"></div>
+            </section>
+
+            <section class="si-card">
+                <h2>2. External title</h2>
+                <div class="si-field">
+                    <label for="si-title-search">Search metadata providers</label>
+                    <input id="si-title-search" is="emby-input" type="text" placeholder="Stardust Crusaders..." />
+                </div>
+                <div id="si-title-results" class="si-results"></div>
+            </section>
+
+            <section class="si-card si-full">
+                <h2>3. Confirm mapping</h2>
+                <div id="si-selection" class="si-selection">Choose a local season and an external title.</div>
+                <div class="si-actions">
+                    <button id="si-save" class="si-save" disabled>Save &amp; Refresh</button>
+                </div>
+                <div id="si-status" class="si-status"></div>
+            </section>
+
+            <section class="si-card si-full">
+                <h2>Existing mappings</h2>
+                <div id="si-mappings" class="si-mappings"></div>
+            </section>
+        </div>
+    </div>
+</div>

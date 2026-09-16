@@ -1,0 +1,33 @@
+name: Build plugins
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  season-identifier:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore Jellyfin-Plugins.slnx
+
+      - name: Build
+        run: dotnet build Jellyfin-Plugins.slnx -c Release --no-restore
+
+      - name: Upload plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: SeasonIdentifier
+          path: |
+            SeasonIdentifier/Jellyfin.Plugin.SeasonIdentifier/bin/Release/net10.0/Jellyfin.Plugin.SeasonIdentifier.dll
+          if-no-files-found: error
