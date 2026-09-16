@@ -117,7 +117,7 @@ public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>
         if (isManualIdentify
             || (!options.IsAutomated && options.MetadataRefreshMode == MetadataRefreshMode.FullRefresh))
         {
-            QueueEpisodeRefreshes(item, options);
+            await QueueEpisodeRefreshesAsync(item, mapping, options, cancellationToken).ConfigureAwait(false);
         }
 
         return updateType;
@@ -148,10 +148,57 @@ public class SeasonMappingMetadataProvider : ICustomMetadataProvider<Season>
         };
     }
 
-    private void QueueEpisodeRefreshes(Season season, MetadataRefreshOptions sourceOptions)
+    private async Task QueueEpisodeRefreshesAsync(
+        Season season,
+        SeasonMapping mapping,
+        MetadataRefreshOptions sourceOptions,
+        CancellationToken cancellationToken)
     {
-        foreach (var episode in season.GetEpisodes().OfType<Episode>().Where(x => !x.IsVirtualItem))
+        // GetEpisodes() is metadata-aware and can exclude episodes whose stale metadata already says
+        // they belong to another season. Start with the physical descendants of this folder instead,
+        // then add Jellyfin's logical list as a fallback for virtual/non-standard layouts.
+        var episodes = season
+            .GetRecursiveChildren(i => i is Episode)
+            .OfType<Episode>()
+            .Concat(season.GetEpisodes().OfType<Episode>())
+            .Where(x => !x.IsVirtualItem)
+            .DistinctBy(x => x.Id)
+            .ToArray();
+
+        var localSeasonNumber = season.IndexNumber ?? mapping.LocalSeasonNumber;
+        var localSeries = season.Series;
+
+        foreach (var episode in episodes)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var repairedLocalIdentity = false;
+
+            if (episode.SeasonId != season.Id)
+            {
+                episode.SeasonId = season.Id;
+                repairedLocalIdentity = true;
+            }
+
+            if (localSeasonNumber.HasValue && episode.ParentIndexNumber != localSeasonNumber.Value)
+            {
+                episode.ParentIndexNumber = localSeasonNumber.Value;
+                repairedLocalIdentity = true;
+            }
+
+            if (localSeries is not null && episode.SeriesId != localSeries.Id)
+            {
+                episode.SeriesId = localSeries.Id;
+                repairedLocalIdentity = true;
+            }
+
+            // Persist the repaired local linkage before queuing the metadata refresh so the queued
+            // Episode object resolves back to this mapped Season instead of a stale cached season.
+            if (repairedLocalIdentity)
+            {
+                await episode.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
+            }
+
             var options = new MetadataRefreshOptions(sourceOptions)
             {
                 MetadataRefreshMode = MetadataRefreshMode.FullRefresh,

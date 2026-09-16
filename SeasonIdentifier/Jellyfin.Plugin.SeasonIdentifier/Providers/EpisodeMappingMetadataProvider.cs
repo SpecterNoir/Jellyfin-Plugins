@@ -44,12 +44,13 @@ public class EpisodeMappingMetadataProvider : ICustomMetadataProvider<Episode>
             return ItemUpdateType.None;
         }
 
-        // SeasonId is not guaranteed to be populated on every Episode object. Jellyfin's own
-        // Episode.Season accessor falls back to the folder hierarchy, so do the same here.
-        var localSeasonId = item.SeasonId;
+        // The physical folder hierarchy is authoritative. A previous bad metadata match can leave
+        // Episode.SeasonId populated with a stale/virtual season, so do not trust the cached id first.
+        // FindSeasonId() checks the real parent Season before falling back to metadata numbering.
+        var localSeasonId = item.FindSeasonId();
         if (localSeasonId == Guid.Empty)
         {
-            localSeasonId = item.Season?.Id ?? Guid.Empty;
+            localSeasonId = item.SeasonId;
         }
 
         if (localSeasonId == Guid.Empty)
@@ -61,6 +62,26 @@ public class EpisodeMappingMetadataProvider : ICustomMetadataProvider<Episode>
         if (mapping is null || !string.Equals(mapping.Mode, "Title", StringComparison.OrdinalIgnoreCase))
         {
             return ItemUpdateType.None;
+        }
+
+        // Repair stale local season linkage before doing any remote lookup. The external title is
+        // only a metadata source; it must never be allowed to redefine the user's local hierarchy.
+        var localSeason = _libraryManager.GetItemById(localSeasonId) as Season;
+        if (localSeason is not null)
+        {
+            item.SeasonId = localSeason.Id;
+
+            var localSeasonNumber = localSeason.IndexNumber ?? mapping.LocalSeasonNumber;
+            if (localSeasonNumber.HasValue)
+            {
+                item.ParentIndexNumber = localSeasonNumber.Value;
+            }
+
+            var localSeries = localSeason.Series;
+            if (localSeries is not null)
+            {
+                item.SeriesId = localSeries.Id;
+            }
         }
 
         var providers = _providerManager

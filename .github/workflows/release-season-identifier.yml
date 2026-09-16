@@ -66,7 +66,7 @@ jobs:
           gh release create "$TAG" "$ASSET" \
             --target "$GITHUB_SHA" \
             --title "Season Identifier ${VERSION}" \
-            --notes "Season Identifier ${VERSION} for Jellyfin 12.x. Repairs mapped episode metadata and adds mapped title/episode artwork while preserving local numbering."
+            --notes "Season Identifier ${VERSION} for Jellyfin 12.x. Makes the physical season folder authoritative for episode repair and mapped metadata refreshes."
 
           export VERSION CHECKSUM TIMESTAMP SOURCE_URL
           python3 - <<'PY'
@@ -98,7 +98,7 @@ jobs:
           version = os.environ['VERSION']
           entry = {
               'version': version,
-              'changelog': "Repairs mapped episode metadata by resolving the real parent season when SeasonId is not cached, expands copied source metadata, cascades manual season refreshes to child episodes, and adds mapped TMDb series posters/backdrops plus episode stills without changing the local series hierarchy or numbering.",
+              'changelog': "Makes the physical season folder authoritative when repairing mapped episodes. Episode refreshes now enumerate physical descendants instead of relying only on Jellyfin's metadata-filtered season list, replace stale cached SeasonId/season-number links before refresh, and resolve mappings from the real parent season first.",
               'targetAbi': '12.0.0.0',
               'sourceUrl': os.environ['SOURCE_URL'],
               'checksum': os.environ['CHECKSUM'],
