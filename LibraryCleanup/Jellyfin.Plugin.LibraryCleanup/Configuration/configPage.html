@@ -1,0 +1,83 @@
+<div id="LibraryCleanupPage"
+     data-role="page"
+     class="page type-interior pluginConfigurationPage"
+     data-require="emby-button"
+     data-controller="__plugin/LibraryCleanup_admin.js">
+    <style>
+        #LibraryCleanupPage * { box-sizing: border-box; }
+        #LibraryCleanupPage .lc-shell { max-width: 1150px; margin: 0 auto; padding: 2rem 1.2rem 5rem; }
+        #LibraryCleanupPage .lc-head { display: flex; gap: 1rem; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; margin-bottom: 1rem; }
+        #LibraryCleanupPage h1 { margin: 0 0 .35rem; }
+        #LibraryCleanupPage .lc-muted { opacity: .72; }
+        #LibraryCleanupPage .lc-safe { border-left: 3px solid #22c55e; background: rgba(34,197,94,.08); padding: .85rem 1rem; line-height: 1.5; margin-bottom: 1rem; }
+        #LibraryCleanupPage .lc-card { border: 1px solid rgba(255,255,255,.13); border-radius: 14px; padding: 1rem; background: rgba(255,255,255,.04); margin-bottom: 1rem; }
+        #LibraryCleanupPage .lc-summary { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .7rem; margin-bottom: 1rem; }
+        #LibraryCleanupPage .lc-stat { padding: .9rem; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+        #LibraryCleanupPage .lc-stat strong { font-size: 1.55rem; display: block; }
+        #LibraryCleanupPage .lc-toolbar { display: flex; gap: .6rem; flex-wrap: wrap; }
+        #LibraryCleanupPage .lc-action { border: 1px solid rgba(0,164,220,.7); color: inherit; background: rgba(0,164,220,.13); border-radius: 8px; padding: .6rem .85rem; cursor: pointer; }
+        #LibraryCleanupPage .lc-action.safe { border-color: rgba(34,197,94,.7); background: rgba(34,197,94,.12); }
+        #LibraryCleanupPage .lc-action.secondary { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.06); }
+        #LibraryCleanupPage .lc-action:disabled { opacity: .45; cursor: default; }
+        #LibraryCleanupPage .lc-filters { display: flex; gap: .45rem; flex-wrap: wrap; margin: .8rem 0; }
+        #LibraryCleanupPage .lc-filter { border: 1px solid rgba(255,255,255,.16); border-radius: 999px; background: transparent; color: inherit; padding: .38rem .65rem; cursor: pointer; }
+        #LibraryCleanupPage .lc-filter.active { background: rgba(0,164,220,.18); border-color: rgba(0,164,220,.75); }
+        #LibraryCleanupPage .lc-list { display: grid; gap: .65rem; }
+        #LibraryCleanupPage .lc-issue { border: 1px solid rgba(255,255,255,.11); border-radius: 11px; padding: .85rem; background: rgba(0,0,0,.12); }
+        #LibraryCleanupPage .lc-issue-head { display: flex; gap: .7rem; justify-content: space-between; align-items: flex-start; }
+        #LibraryCleanupPage .lc-issue strong { display: block; }
+        #LibraryCleanupPage .lc-detail { margin: .45rem 0; line-height: 1.45; opacity: .83; }
+        #LibraryCleanupPage .lc-context { font-size: .88rem; opacity: .68; overflow-wrap: anywhere; }
+        #LibraryCleanupPage .lc-badges { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
+        #LibraryCleanupPage .lc-badge { font-size: .76rem; padding: .15rem .43rem; border-radius: 999px; background: rgba(255,255,255,.08); }
+        #LibraryCleanupPage .lc-badge.Critical { background: rgba(239,68,68,.18); color: #fecaca; }
+        #LibraryCleanupPage .lc-badge.Warning { background: rgba(245,158,11,.18); color: #fde68a; }
+        #LibraryCleanupPage .lc-buttons { display: flex; gap: .45rem; flex-wrap: wrap; margin-top: .7rem; }
+        #LibraryCleanupPage .lc-empty { padding: 1rem 0; opacity: .7; }
+        #LibraryCleanupPage .lc-status { min-height: 1.4rem; margin-top: .7rem; }
+        #LibraryCleanupPage .lc-status.good { color: #86efac; }
+        #LibraryCleanupPage .lc-status.error { color: #fca5a5; }
+        @media(max-width:760px) {
+            #LibraryCleanupPage .lc-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
+            #LibraryCleanupPage .lc-issue-head { display: block; }
+        }
+    </style>
+
+    <div class="lc-shell">
+        <div class="lc-head">
+            <div>
+                <h1>Library Cleanup</h1>
+                <div class="lc-muted">Find and repair common Jellyfin season and episode database/metadata mistakes.</div>
+            </div>
+            <div class="lc-toolbar">
+                <button id="lc-scan" class="lc-action secondary">Scan again</button>
+                <button id="lc-repair-safe" class="lc-action safe">Repair all safe issues</button>
+            </div>
+        </div>
+
+        <div class="lc-safe">
+            <strong>Conservative first build.</strong>
+            Safe Repair only realigns stale episode SeasonId, SeriesId, and season-number links to the episode's physical folder hierarchy, then queues a normal Jellyfin refresh. The plugin does not delete, move, rename, or recycle media files. Duplicate database records are diagnosed but are not automatically purged in v0.1.
+        </div>
+
+        <div class="lc-summary">
+            <div class="lc-stat"><strong id="lc-episodes">–</strong><span>Episodes scanned</span></div>
+            <div class="lc-stat"><strong id="lc-seasons">–</strong><span>Seasons scanned</span></div>
+            <div class="lc-stat"><strong id="lc-issues">–</strong><span>Issues found</span></div>
+            <div class="lc-stat"><strong id="lc-safe-count">–</strong><span>Safe repairs</span></div>
+        </div>
+
+        <section class="lc-card">
+            <h2>Detected issues</h2>
+            <div class="lc-filters" id="lc-filters">
+                <button class="lc-filter active" data-filter="all">All</button>
+                <button class="lc-filter" data-filter="Critical">Critical</button>
+                <button class="lc-filter" data-filter="Warning">Warnings</button>
+                <button class="lc-filter" data-filter="safe">Safe repairs</button>
+            </div>
+            <div id="lc-list" class="lc-list"><div class="lc-empty">Scanning Jellyfin…</div></div>
+        </section>
+
+        <div id="lc-status" class="lc-status"></div>
+    </div>
+</div>
