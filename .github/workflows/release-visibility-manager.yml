@@ -66,7 +66,7 @@ jobs:
           gh release create "$TAG" "$ASSET" \
             --target "$GITHUB_SHA" \
             --title "Visibility Manager ${VERSION}" \
-            --notes "Initial Visibility Manager build for Jellyfin 12.x. Hides selected Series, Seasons (including virtual seasons), Movies, and Episodes through reversible Jellyfin visibility metadata. No media files are deleted, moved, renamed, or recycled."
+            --notes "Visibility Manager ${VERSION} for Jellyfin 12.x. Adds a Remove action directly to Jellyfin item three-dot menus. Remove only hides the Jellyfin library entry through reversible visibility metadata; media files are never deleted, moved, renamed, or recycled."
 
           export VERSION CHECKSUM TIMESTAMP SOURCE_URL
           python3 - <<'PY'
@@ -83,8 +83,8 @@ jobs:
               plugin = {
                   'guid': plugin_guid,
                   'name': 'Visibility Manager',
-                  'description': 'Hide selected Jellyfin library entries from normal browsing and search without deleting, moving, or renaming media files.',
-                  'overview': 'Reversibly hide unwanted or duplicate library entries.',
+                  'description': 'Remove selected Jellyfin library entries from normal browsing without deleting, moving, or renaming media files.',
+                  'overview': 'Reversibly remove unwanted or duplicate library entries from view.',
                   'owner': 'SpecterNoir',
                   'category': 'General',
                   'versions': []
@@ -94,14 +94,15 @@ jobs:
           version = os.environ['VERSION']
           entry = {
               'version': version,
-              'changelog': 'Initial release. Adds a dedicated visibility page for Series, Seasons including virtual seasons, Movies, and Episodes. Hide and Restore use a reversible Jellyfin metadata marker and native blocked-tag filtering; media files and library database entries are never deleted.',
+              'changelog': 'Adds Remove directly to Jellyfin three-dot item menus on cards, lists, and detail pages. Remove is reversible visibility suppression only: media files and Jellyfin database entries are never deleted. Expands support to normal library item types while excluding structural library-root containers.',
               'targetAbi': '12.0.0.0',
               'sourceUrl': os.environ['SOURCE_URL'],
               'checksum': os.environ['CHECKSUM'],
               'timestamp': os.environ['TIMESTAMP']
           }
 
-          plugin['description'] = 'Hide selected Jellyfin library entries from normal browsing and search without deleting, moving, or renaming media files.'
+          plugin['description'] = 'Remove selected Jellyfin library entries from normal browsing without deleting, moving, or renaming media files.'
+          plugin['overview'] = 'Reversibly remove unwanted or duplicate library entries from view.'
           plugin['versions'] = [v for v in plugin.get('versions', []) if v.get('version') != version]
           plugin['versions'].insert(0, entry)
           path.write_text(json.dumps(catalog, indent=2) + '\n', encoding='utf-8')
