@@ -24,6 +24,18 @@ Primary use case:
 - Flatten the external title's numbered seasons into the local season episode sequence.
 - Ignore external Season 0 / Specials.
 
-Native Season Identify uses **File Transformation** by IAmParadox27 to expose Jellyfin Web's existing Identify command on Season items without modifying Jellyfin's installed web files. The dependency is included in this catalog.
-
 See [`SeasonIdentifier/README.md`](SeasonIdentifier/README.md) for current scope.
+
+## Visibility Manager
+
+Visibility Manager reversibly hides selected Series, Seasons, Movies, and Episodes from normal Jellyfin browsing without deleting or moving media files.
+
+See [`VisibilityManager/README.md`](VisibilityManager/README.md) for current scope.
+
+## Library Cleanup
+
+Library Cleanup diagnoses common Jellyfin season/episode inconsistencies such as duplicate database paths, duplicate numbering, virtual/phantom entries, missing media paths, incomplete numbering, and stale cached season/series links.
+
+Version 0.1 provides conservative Safe Repair for stale hierarchy links and Jellyfin-native metadata refresh actions. It does not automatically purge duplicate database rows and never deletes, moves, renames, or recycles media files.
+
+See [`LibraryCleanup/README.md`](LibraryCleanup/README.md) for current scope.
