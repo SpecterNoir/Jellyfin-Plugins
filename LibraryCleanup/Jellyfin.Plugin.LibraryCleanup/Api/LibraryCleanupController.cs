@@ -118,7 +118,7 @@ public sealed class LibraryCleanupController : ControllerBase
             Recursive = true,
             IncludeItemTypes = [kind],
             Limit = 100000
-        }).Items;
+        }).Items.ToArray();
 
     private static void AddDuplicatePathIssues(IEnumerable<Episode> episodes, ICollection<CleanupIssueDto> issues)
     {
@@ -289,7 +289,7 @@ public sealed class LibraryCleanupController : ControllerBase
                     [episode.Id]));
             }
 
-            if (!string.IsNullOrWhiteSpace(episode.Path) && !File.Exists(episode.Path))
+            if (!string.IsNullOrWhiteSpace(episode.Path) && !System.IO.File.Exists(episode.Path))
             {
                 issues.Add(new CleanupIssueDto(
                     $"missing-file:{episode.Id}",
@@ -301,7 +301,7 @@ public sealed class LibraryCleanupController : ControllerBase
                     episode.Name ?? "(Unnamed episode)",
                     context.SeriesName,
                     context.SeasonName,
-                    episode.Path,
+                    episode.Path ?? string.Empty,
                     false,
                     true,
                     [episode.Id]));
