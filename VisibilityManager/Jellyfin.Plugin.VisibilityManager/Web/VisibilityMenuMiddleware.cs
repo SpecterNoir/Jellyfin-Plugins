@@ -11,7 +11,7 @@ namespace Jellyfin.Plugin.VisibilityManager.Web;
 public sealed class VisibilityMenuMiddleware
 {
     private const string ScriptFileName = "visibility-manager.js";
-    private const string ScriptTag = "<script src=\"visibility-manager.js?v=0.2.0.0\"></script>";
+    private const string ScriptTag = "<script src=\"visibility-manager.js?v=0.2.1.0\"></script>";
 
     private static readonly byte[] ScriptBytes = Encoding.UTF8.GetBytes(MenuScript);
 
@@ -117,7 +117,7 @@ public sealed class VisibilityMenuMiddleware
     if (window.__visibilityManagerMenuV2) return;
     window.__visibilityManagerMenuV2 = true;
 
-    const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const guidPattern = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
     let pending = null;
 
     function isGuid(value) {
@@ -135,7 +135,7 @@ public sealed class VisibilityMenuMiddleware
     }
 
     function idFromLocation() {
-        const match = window.location.href.match(/[?&#]id=([0-9a-f-]{36})(?:[&#]|$)/i);
+        const match = window.location.href.match(/[?&#]id=([0-9a-f]{32}|[0-9a-f-]{36})(?:[&#]|$)/i);
         return match && isGuid(match[1]) ? match[1] : null;
     }
 
@@ -170,7 +170,8 @@ public sealed class VisibilityMenuMiddleware
     }
 
     function removeVisibleCopies(itemId) {
-        document.querySelectorAll(`[data-id="${CSS.escape(itemId)}"]`).forEach((element) => {
+        const escaped = window.CSS?.escape ? window.CSS.escape(itemId) : itemId;
+        document.querySelectorAll(`[data-id="${escaped}"]`).forEach((element) => {
             const item = element.closest('.card, .listItem');
             if (item) item.remove();
         });
@@ -274,7 +275,7 @@ public sealed class VisibilityMenuMiddleware
         if (!pending || Date.now() - pending.time > 3500) return;
 
         const sheets = Array.from(document.querySelectorAll('.actionSheet.opened, .actionSheet'));
-        const sheet = sheets.at(-1);
+        const sheet = sheets.length ? sheets[sheets.length - 1] : null;
         if (!sheet || sheet.querySelector('.visibilityManagerRemove')) return;
 
         const scroller = sheet.querySelector('.actionSheetScroller');
