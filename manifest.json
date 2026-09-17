@@ -77,5 +77,23 @@
         "timestamp": "2026-09-16T16:51:57Z"
       }
     ]
+  },
+  {
+    "guid": "d3f1a24e-8d86-4a28-9c5b-6a4e9024f5b1",
+    "name": "Library Cleanup",
+    "description": "Diagnose and safely repair common Jellyfin season and episode library inconsistencies without touching media files.",
+    "overview": "Scan for phantom duplicates, stale links, numbering problems, virtual items, and other TV library inconsistencies.",
+    "owner": "SpecterNoir",
+    "category": "Metadata",
+    "versions": [
+      {
+        "version": "0.1.0.0",
+        "changelog": "Initial release. Adds a season/episode cleanup dashboard that detects duplicate database paths, duplicate episode and season numbering, virtual items, missing files, incomplete numbering, and stale episode hierarchy links. Safe Repair realigns stale SeasonId, SeriesId, and season-number links to the physical folder hierarchy. Duplicate database rows are diagnostic-only in v0.1 and media files are never deleted or moved.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/SpecterNoir/Jellyfin-Plugins/releases/download/library-cleanup-v0.1.0.0/LibraryCleanup_0.1.0.0.zip",
+        "checksum": "6bde1924a71ecbec30bad6f37ee0625c",
+        "timestamp": "2026-09-17T07:06:55Z"
+      }
+    ]
   }
 ]
