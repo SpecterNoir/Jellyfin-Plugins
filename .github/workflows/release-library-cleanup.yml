@@ -1,0 +1,116 @@
+name: Publish Library Cleanup
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'LibraryCleanup/**'
+      - '.github/workflows/release-library-cleanup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        run: dotnet build LibraryCleanup/Jellyfin.Plugin.LibraryCleanup/Jellyfin.Plugin.LibraryCleanup.csproj -c Release
+
+      - name: Package, release, and update catalog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DLL='LibraryCleanup/Jellyfin.Plugin.LibraryCleanup/bin/Release/net10.0/Jellyfin.Plugin.LibraryCleanup.dll'
+
+          VERSION=$(python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse('LibraryCleanup/Jellyfin.Plugin.LibraryCleanup/Jellyfin.Plugin.LibraryCleanup.csproj').getroot()
+          version = root.findtext('.//Version')
+          if not version:
+              raise SystemExit('Plugin <Version> is missing from csproj')
+          print(version.strip())
+          PY
+          )
+
+          TAG="library-cleanup-v${VERSION}"
+          ASSET="LibraryCleanup_${VERSION}.zip"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Release $TAG already exists. Bump <Version> before publishing another Library Cleanup build."
+            exit 1
+          fi
+
+          rm -rf package "$ASSET"
+          mkdir package
+          cp "$DLL" package/
+          (cd package && zip -q -r "../$ASSET" .)
+
+          CHECKSUM=$(md5sum "$ASSET" | awk '{print $1}')
+          TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          SOURCE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${ASSET}"
+
+          gh release create "$TAG" "$ASSET" \
+            --target "$GITHUB_SHA" \
+            --title "Library Cleanup ${VERSION}" \
+            --notes "Initial Library Cleanup build for Jellyfin 12.x. Scans seasons and episodes for duplicate database paths, duplicate numbering, virtual/phantom items, missing files, incomplete numbering, and stale cached hierarchy links. Safe Repair realigns stale episode links to the physical folder hierarchy. Duplicate rows are diagnostic-only in this first release; media files are never deleted, moved, renamed, or recycled."
+
+          export VERSION CHECKSUM TIMESTAMP SOURCE_URL
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path('manifest.json')
+          catalog = json.loads(path.read_text(encoding='utf-8')) if path.exists() else []
+
+          plugin_guid = 'd3f1a24e-8d86-4a28-9c5b-6a4e9024f5b1'
+          plugin = next((item for item in catalog if item.get('guid') == plugin_guid), None)
+          if plugin is None:
+              plugin = {
+                  'guid': plugin_guid,
+                  'name': 'Library Cleanup',
+                  'description': 'Diagnose and safely repair common Jellyfin season and episode library inconsistencies without touching media files.',
+                  'overview': 'Scan for phantom duplicates, stale links, numbering problems, virtual items, and other TV library inconsistencies.',
+                  'owner': 'SpecterNoir',
+                  'category': 'Metadata',
+                  'versions': []
+              }
+              catalog.append(plugin)
+
+          version = os.environ['VERSION']
+          entry = {
+              'version': version,
+              'changelog': 'Initial release. Adds a season/episode cleanup dashboard that detects duplicate database paths, duplicate episode and season numbering, virtual items, missing files, incomplete numbering, and stale episode hierarchy links. Safe Repair realigns stale SeasonId, SeriesId, and season-number links to the physical folder hierarchy. Duplicate database rows are diagnostic-only in v0.1 and media files are never deleted or moved.',
+              'targetAbi': '12.0.0.0',
+              'sourceUrl': os.environ['SOURCE_URL'],
+              'checksum': os.environ['CHECKSUM'],
+              'timestamp': os.environ['TIMESTAMP']
+          }
+
+          plugin['description'] = 'Diagnose and safely repair common Jellyfin season and episode library inconsistencies without touching media files.'
+          plugin['versions'] = [v for v in plugin.get('versions', []) if v.get('version') != version]
+          plugin['versions'].insert(0, entry)
+          path.write_text(json.dumps(catalog, indent=2) + '\n', encoding='utf-8')
+          PY
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add manifest.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update plugin catalog for Library Cleanup ${VERSION} [skip ci]"
+            git push origin HEAD:main
+          fi
