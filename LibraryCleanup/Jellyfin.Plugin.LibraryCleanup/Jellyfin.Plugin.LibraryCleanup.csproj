@@ -4,9 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Jellyfin.Plugin.LibraryCleanup</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.LibraryCleanup</AssemblyName>
-    <Version>0.1.0.0</Version>
-    <AssemblyVersion>0.1.0.0</AssemblyVersion>
-    <FileVersion>0.1.0.0</FileVersion>
+    <Version>0.2.0.0</Version>
+    <AssemblyVersion>0.2.0.0</AssemblyVersion>
+    <FileVersion>0.2.0.0</FileVersion>
     <Description>Diagnose and safely repair common Jellyfin season and episode library inconsistencies without touching media files.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
@@ -31,6 +31,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Configuration\configPage.html" />
     <EmbeddedResource Include="Configuration\admin.js" />
+    <EmbeddedResource Include="Web\client.js" />
   </ItemGroup>
 
 </Project>
