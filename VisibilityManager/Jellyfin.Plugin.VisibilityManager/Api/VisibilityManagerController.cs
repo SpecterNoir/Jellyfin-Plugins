@@ -1,4 +1,3 @@
-using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.VisibilityManager.Services;
 using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Entities;
@@ -16,14 +15,6 @@ namespace Jellyfin.Plugin.VisibilityManager.Api;
 [Authorize(Policy = Policies.RequiresElevation)]
 public class VisibilityManagerController : ControllerBase
 {
-    private static readonly BaseItemKind[] SupportedKinds =
-    [
-        BaseItemKind.Series,
-        BaseItemKind.Season,
-        BaseItemKind.Movie,
-        BaseItemKind.Episode
-    ];
-
     private readonly ILibraryManager _libraryManager;
     private readonly VisibilityPolicyService _visibilityPolicy;
 
@@ -42,7 +33,7 @@ public class VisibilityManagerController : ControllerBase
     {
         await _visibilityPolicy.EnsureAllUsersBlockMarkerAsync().ConfigureAwait(false);
 
-        var items = QuerySupportedItems()
+        var items = QueryManageableItems()
             .Where(item => !VisibilityPolicyService.IsEffectivelyHidden(item));
 
         if (!string.IsNullOrWhiteSpace(q))
@@ -67,7 +58,7 @@ public class VisibilityManagerController : ControllerBase
     {
         await _visibilityPolicy.EnsureAllUsersBlockMarkerAsync().ConfigureAwait(false);
 
-        return Ok(QuerySupportedItems()
+        return Ok(QueryManageableItems()
             .Where(VisibilityPolicyService.IsExplicitlyHidden)
             .OrderBy(item => item.GetParent()?.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
             .ThenBy(item => item.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
@@ -85,9 +76,9 @@ public class VisibilityManagerController : ControllerBase
             return NotFound();
         }
 
-        if (!SupportedKinds.Contains(item.GetBaseItemKind()))
+        if (!IsManageableItem(item))
         {
-            return BadRequest(new { message = "This item type is not supported by Visibility Manager yet." });
+            return BadRequest(new { message = "This Jellyfin system container cannot be removed from view." });
         }
 
         if (!VisibilityPolicyService.IsExplicitlyHidden(item))
@@ -134,13 +125,23 @@ public class VisibilityManagerController : ControllerBase
         return Ok(ToDto(item));
     }
 
-    private IEnumerable<BaseItem> QuerySupportedItems()
+    private IEnumerable<BaseItem> QueryManageableItems()
         => _libraryManager.GetItemsResult(new InternalItemsQuery
         {
             Recursive = true,
-            IncludeItemTypes = SupportedKinds,
-            Limit = 20000
-        }).Items;
+            Limit = 50000
+        }).Items.Where(IsManageableItem);
+
+    private static bool IsManageableItem(BaseItem item)
+    {
+        // Prevent hiding Jellyfin's structural/root containers while allowing normal media,
+        // virtual seasons, people, genres, playlists, collections, music, books, etc.
+        var kind = item.GetBaseItemKind().ToString();
+        return !string.Equals(kind, "AggregateFolder", StringComparison.Ordinal)
+            && !string.Equals(kind, "UserRootFolder", StringComparison.Ordinal)
+            && !string.Equals(kind, "CollectionFolder", StringComparison.Ordinal)
+            && !string.Equals(kind, "Folder", StringComparison.Ordinal);
+    }
 
     private static bool Matches(BaseItem item, string term)
     {
