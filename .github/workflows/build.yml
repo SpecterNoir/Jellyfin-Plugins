@@ -39,3 +39,11 @@ jobs:
           path: |
             VisibilityManager/Jellyfin.Plugin.VisibilityManager/bin/Release/net10.0/Jellyfin.Plugin.VisibilityManager.dll
           if-no-files-found: error
+
+      - name: Upload Library Cleanup
+        uses: actions/upload-artifact@v4
+        with:
+          name: LibraryCleanup
+          path: |
+            LibraryCleanup/Jellyfin.Plugin.LibraryCleanup/bin/Release/net10.0/Jellyfin.Plugin.LibraryCleanup.dll
+          if-no-files-found: error
