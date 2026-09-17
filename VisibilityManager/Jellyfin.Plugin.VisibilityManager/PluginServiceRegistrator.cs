@@ -1,6 +1,8 @@
 using Jellyfin.Plugin.VisibilityManager.Services;
+using Jellyfin.Plugin.VisibilityManager.Web;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Jellyfin.Plugin.VisibilityManager;
@@ -14,5 +16,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     {
         _ = applicationHost;
         serviceCollection.AddSingleton<VisibilityPolicyService>();
+        serviceCollection.AddTransient<IStartupFilter, VisibilityMenuStartupFilter>();
     }
 }
