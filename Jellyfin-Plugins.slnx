@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="SeasonIdentifier/Jellyfin.Plugin.SeasonIdentifier/Jellyfin.Plugin.SeasonIdentifier.csproj" />
   <Project Path="VisibilityManager/Jellyfin.Plugin.VisibilityManager/Jellyfin.Plugin.VisibilityManager.csproj" />
+  <Project Path="LibraryCleanup/Jellyfin.Plugin.LibraryCleanup/Jellyfin.Plugin.LibraryCleanup.csproj" />
 </Solution>
